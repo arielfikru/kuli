@@ -2,33 +2,48 @@
 
 Give your AI coding agent (Claude Code) a pool of cheap **interns**. Claude stays
 the senior — it scopes the work, hands it to the right intern, then **reviews the
-output before anything ships**. KULI bundles three interns behind one consistent
-CLI vocabulary and one optional MCP server:
+output before anything ships**. KULI bundles them behind one consistent CLI
+vocabulary and one optional MCP server:
 
 | Intern | CLI | Niche | Backend |
 |--------|-----|-------|---------|
 | **deepseek** | `ask-deepseek` | cheap text / bulk reasoning | OpenRouter (DeepSeek V4) |
 | **or** | `ask-or` | any model — you pick the slug | OpenRouter (any model) |
-| **gemini** | `ask-gemini` / `ask-gemini-code` | vision (images/video) + repo coding | Gemini CLI (gemini-3.1-pro) |
+| **gemini** | `ask-gemini` · `ask-gemini-code` | vision (images/video) + repo coding | Gemini CLI (gemini-3.1-pro) |
 | **codex** | `ask-codex` | agentic coding — Q&A or file edits | OpenAI Codex (`codex exec`) |
+| **recraft** | `ask-recraft` | SVG vector generation | OpenRouter (Recraft V4.1 Vector) |
 
 Each has a `-batch` variant for parallel fan-out. All share one core
 (`kuli/core.py`): prompt assembly, self-consistency voting, the stats line, and
 batch fan-out are written once and behave identically across interns.
 
-## Why three, not one
+## Why a pool, not one mega-binary
 
 They are genuinely different tools, not skins of one model:
 
-- **deepseek** is text-only and cheap — research, summarizing, drafting, bulk
-  transforms.
-- **gemini** is the only one that can *see* pixels/frames — screenshots, UI bugs,
-  video, OCR.
-- **codex** reads a real repo and (with `--apply`) edits files in a sandbox —
-  code review and scoped implementation.
+- **deepseek / or** — text-only, cheap: research, summarizing, drafting, bulk
+  transforms (`or` lets you pick any OpenRouter model).
+- **gemini** — the only one that can *see* pixels/frames (screenshots, UI bugs,
+  video, OCR) **and** code in a real repo (`ask-gemini-code`).
+- **codex** — reads a repo and (with `--apply`) edits files in a sandbox.
+- **recraft** — generates real SVG vector art.
 
 Different backends, auth, and capabilities — so they stay separate engines under
-a shared core, rather than one confused mega-binary.
+a shared core. Add more in one command with `scripts/make-intern.py`
+(shapes: `api` | `cli` | `persona` | `image`).
+
+## Two modes: text vs agentic
+
+- **Text** (default for deepseek/or/gemini): one API call, you feed the context
+  (`-f`/stdin). Cheap and fast for non-repo work.
+- **Agentic** (codex, `ask-gemini-code`, or `--agentic`): the harness reads the
+  repo *itself* and can edit files — you give only the task + directory, not file
+  contents. Heavier per call, but it keeps big context out of Claude.
+
+**Three agentic backends:** `ask-codex` (ChatGPT login), `ask-gemini-code`
+(Gemini login), and **any OpenRouter model via the Codex harness** —
+`ask-codex --or-model <slug>` or the shortcuts `ask-deepseek --agentic` /
+`ask-or -m <slug> --agentic` (uses `OPENROUTER_API_KEY`, no ChatGPT login).
 
 ## Install
 
@@ -40,8 +55,9 @@ bash install.sh
 Or point your AI agent at it: "Install ini https://github.com/arielfikru/kuli"
 (the agent reads `INSTALL.md` and runs `install.sh`).
 
-This copies the `kuli` package + thin launchers into `~/.claude/bin`, installs
-the three skills into `~/.claude/skills/`, and wires `~/.claude/bin` onto PATH.
+This copies the `kuli` package into `~/.claude/lib`, the launchers + `kuli` admin
+command into `~/.claude/bin`, the skills into `~/.claude/skills/`, and wires
+`~/.claude/bin` onto PATH.
 
 ### Auth (per intern)
 
@@ -104,7 +120,16 @@ ask-gemini-batch -p "any layout issue?" shots/*.png -j 8
 
 Flags: `-f FILE` (repeatable), `--flash` / `--pro` / `-m`, `-c N`, `--raw`,
 `--timeout`, `-q`. Runs from an empty temp dir so each call stays lean (~8k vs
-~90k tokens).
+~90k tokens). **Feed raster (png/jpg/webp/video), not SVG.**
+
+`ask-gemini-code` is the coding lane — it runs IN your repo (read-only by
+default, `--apply` to edit), for high-volume/parallel/visual coding or a
+cross-family review of a diff:
+
+```bash
+ask-gemini-code -C ~/proj "review src/auth.ts for bugs"      # read-only
+ask-gemini-code --apply --worktree "add tests for the parser"  # edits, in a worktree
+```
 
 ### codex — coding (read-only & agentic)
 
@@ -124,6 +149,26 @@ ask-codex-batch --cd apps/api < questions.txt    # read-only fan-out
 Flags: `--apply` (write mode; default read-only), `--cd DIR`, `-f FILE`,
 `-i IMAGE`, `-m`, `-c N` (read-only only), `--timeout`, `--json`, `-q`.
 Danger sandbox modes are intentionally not exposed.
+
+Run the harness on **any OpenRouter model** (no ChatGPT login) with `--or-model`:
+
+```bash
+ask-codex --or-model deepseek/deepseek-v4-pro --apply -C ../wt "implement X"
+# same engine as the shortcuts below:
+ask-deepseek --agentic --apply -C ../wt "add a docstring + a subtract() fn"
+ask-or -m anthropic/claude-opus-4 --agentic "review this repo"   # read-only
+```
+
+### recraft — SVG vector generation
+
+```bash
+ask-recraft -o logo.svg "minimal red fox head logo, flat geometric, two colors"
+ask-recraft -i sketch.png -o clean.svg "clean vector version of this sketch"
+printf 'sun icon\nmoon icon\n' | ask-recraft-batch -j 3
+```
+
+Flags: `-o FILE`, `-i IMAGE` (one input), `--timeout`, `-q`. Writes an `.svg` and
+prints its path. For icons/logos/illustrations — not photos (use a raster model).
 
 ## The intern protocol (every call)
 
@@ -169,21 +214,26 @@ A single MCP server exposes all interns as typed tools:
 claude mcp add kuli -- python3 /abs/path/to/mcp/server.py
 ```
 
-Tools: `ask_deepseek`, `ask_deepseek_batch`, `ask_gemini`, `ask_gemini_batch`,
-`ask_codex`, `ask_codex_batch`. The CLIs remain the source of truth; the server
-only shells out to them.
+Tools: `ask_deepseek(_batch)`, `ask_or(_batch)`, `ask_gemini(_batch)`,
+`ask_gemini_code`, `ask_codex(_batch)`, `ask_recraft`. The CLIs remain the source
+of truth; the server only shells out to them.
 
 ## Layout
 
 ```
 kuli/
-├── kuli/            # shared package
-│   ├── core.py      # voting, stats, batch fan-out, prompt helpers
-│   ├── deepseek.py  gemini.py  codex.py          # ask-* adapters
-│   └── *_batch.py                                 # ask-*-batch adapters
-├── bin/             # thin launchers (import kuli.<mod>:main)
-├── skills/          # /deepseek /gemini /codex
-├── mcp/server.py    # unified MCP server
+├── kuli/             # shared package (installs to ~/.claude/lib/kuli)
+│   ├── core.py       # voting, stats, batch fan-out, prompt helpers
+│   ├── openrouter.py # shared OpenRouter HTTP plumbing
+│   ├── health.py     # advisory circuit-breaker (rate-limit / auth state)
+│   ├── agentic.py    # shim: route --agentic through the codex harness
+│   ├── deepseek.py  ask_or.py  gemini.py  gemini_code.py  codex.py  recraft.py
+│   ├── *_batch.py    # ask-*-batch adapters
+│   └── cli.py        # the `kuli health` admin command
+├── bin/              # thin launchers (add ../lib to sys.path, import kuli.<mod>)
+├── skills/           # /kuli /deepseek /or /gemini /codex /recraft
+├── scripts/make-intern.py   # scaffold a new intern
+├── mcp/server.py     # unified MCP server
 └── install.sh
 ```
 
