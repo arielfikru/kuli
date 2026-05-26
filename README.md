@@ -9,7 +9,7 @@ CLI vocabulary and one optional MCP server:
 |--------|-----|-------|---------|
 | **deepseek** | `ask-deepseek` | cheap text / bulk reasoning | OpenRouter (DeepSeek V4) |
 | **or** | `ask-or` | any model — you pick the slug | OpenRouter (any model) |
-| **gemini** | `ask-gemini` | vision — sees images & video | Gemini CLI (gemini-3.1-pro) |
+| **gemini** | `ask-gemini` / `ask-gemini-code` | vision (images/video) + repo coding | Gemini CLI (gemini-3.1-pro) |
 | **codex** | `ask-codex` | agentic coding — Q&A or file edits | OpenAI Codex (`codex exec`) |
 
 Each has a `-batch` variant for parallel fan-out. All share one core

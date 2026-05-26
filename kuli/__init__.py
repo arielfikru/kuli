@@ -10,4 +10,4 @@ Each ``ask-<intern>`` CLI is a thin adapter over the shared machinery in
 fan-out). Stdlib only — no third-party deps.
 """
 
-__version__ = "2.4.0"
+__version__ = "2.5.0"

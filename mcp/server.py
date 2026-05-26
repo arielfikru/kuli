@@ -220,6 +220,29 @@ def ask_gemini_batch(
     return _run(cmd, stdin="\n".join(prompts) + "\n")
 
 
+@mcp.tool()
+def ask_gemini_code(prompt: str, apply: bool = False, worktree: bool = False,
+                    cd: str = "", model: str = "") -> str:
+    """Gemini as a coding intern — reads/edits a real repo (not vision).
+
+    apply=False (default) = read-only review/understanding (plan mode).
+    apply=True = edit files (auto_edit); caller should set worktree=True and
+    review the diff, never merge blind. cd: working root. Good for high-volume
+    or parallel coding, visual/frontend work, or a cross-family review of a diff.
+    """
+    cmd = [_cli("ask-gemini-code")]
+    if apply:
+        cmd.append("--apply")
+    if worktree:
+        cmd.append("--worktree")
+    if cd:
+        cmd += ["-C", cd]
+    if model:
+        cmd += ["-m", model]
+    cmd.append(prompt)
+    return _run(cmd)
+
+
 # --- recraft: SVG vector image generation -----------------------------------
 
 @mcp.tool()

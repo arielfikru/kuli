@@ -16,7 +16,9 @@ fallback — there is no auto-router, so you always know who actually ran.
 | Cheap text / bulk / summarize / extract | `ask-deepseek` |
 | A specific non-DeepSeek model, or compare models | `ask-or -m <slug>` |
 | Look at an image/video/screenshot (vision) | `ask-gemini -f` |
-| Read a repo, review code, agentic edits | `ask-codex` (`--apply` to edit) |
+| Heavy / long-horizon / precise coding | `ask-codex` (`--apply` to edit) |
+| High-volume / parallel / visual coding, or 2nd-opinion review | `ask-gemini-code` (`--apply`, `-w`) |
+| Read a repo, review code | `ask-codex` or `ask-gemini-code` (read-only) |
 | Generate an SVG icon/logo/illustration | `ask-recraft` |
 
 Routing rules:

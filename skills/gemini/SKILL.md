@@ -1,6 +1,6 @@
 ---
 name: gemini
-description: Delegate image/video/visual analysis to Gemini (gemini-3.1-pro) via the headless Gemini CLI. Use when a task needs to look at a screenshot, photo, diagram, UI mockup, video clip, or any media file and answer questions about it — something text-only models (Claude inline, DeepSeek) cannot do. Trigger when the user says "pakai gemini", "analisa gambar/video ini", "/gemini", or whenever a subtask requires actually seeing pixels/frames. Claude stays the orchestrator and validates output. NOT for image generation (Gemini CLI cannot generate AI images).
+description: Delegate to Gemini (gemini-3.1-pro) via the headless Gemini CLI — two lanes. (1) VISION via ask-gemini: look at a screenshot, photo, diagram, video, any media file and answer about it (text-only models can't). (2) CODING via ask-gemini-code: read/edit a real repo — high-volume or parallel coding (boilerplate, scaffolds, mass-rename, tests, docs), visual/frontend work, or a cross-family second-opinion review of a diff. Trigger when user says "pakai gemini", "analisa gambar/video ini", "gemini buat coding", "/gemini", needs to see pixels/frames, or wants a volume/visual coder. Claude orchestrates + validates (review every ask-gemini-code --apply diff). NOT for image generation (use /recraft).
 ---
 
 # Gemini visual-analysis delegation — the "eyes" intern
@@ -104,6 +104,37 @@ lose the lean cwd and media sandboxing both.
 - Comparing two images (before/after, design vs implementation)
 - OCR-ish extraction from an image when no dedicated OCR is set up
 - Any "look at this and tell me X" where pixels/frames matter
+
+## Coding lane — `ask-gemini-code` (reads/edits a real repo)
+
+`ask-gemini` runs in an empty temp dir (vision, lean). `ask-gemini-code` runs IN
+your working directory so gemini can read project files and code. Read-only by
+default; `--apply` lets it edit.
+
+```bash
+# read-only: review / understand a repo (no writes)
+ask-gemini-code -C ~/proj "review src/auth.ts for bugs, suggest fixes"
+ask-gemini-code "how does the routing layer work here?"
+
+# agentic edits — prefer a throwaway worktree, then review the diff
+ask-gemini-code --apply --worktree "add unit tests for the parser module"
+```
+
+Flags: `--apply` (edit mode = auto_edit; default read-only = plan), `--worktree/-w`
+(fresh git worktree, recommended with `--apply`), `--cd DIR`, `-m`, `--timeout`
+(default 600), `-q`. Shell-command auto-exec (yolo) is not exposed.
+
+**When to use the coding lane (vs codex):**
+- **High-volume / parallel-friendly** coding — boilerplate, scaffolds, mass
+  rename, generate tests, translate comments/docs. Gemini's quota tolerates
+  wider fan-out than codex.
+- **Visual / frontend / multimodal** coding — it can reason over images + code.
+- **Cross-family second opinion** — codex writes, gemini reviews the diff (read
+  only); different model family catches different things.
+- Keep **heavy, long-horizon, must-stay-consistent** refactors on **codex**.
+
+Safety (same as codex --apply): run `--apply` in a throwaway worktree, **review
+the diff before keeping it**, never merge blind, never push without the user's OK.
 
 ## When NOT to delegate
 

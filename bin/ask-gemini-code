@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+"""KULI launcher for ask-gemini-code — thin entry into kuli.gemini_code:main."""
+import os
+import sys
+
+_bin = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(_bin, "..", "lib"))
+from kuli.gemini_code import main
+
+main()
