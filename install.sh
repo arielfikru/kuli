@@ -1,43 +1,69 @@
 #!/usr/bin/env bash
-# Installer for claude-ask-deepseek.
-# Idempotent: copies the CLI + skill into ~/.claude, wires PATH, sets up the key.
+# Installer for KULI — Kana Unified LLM Interns.
+# Idempotent: copies the kuli package + launchers + skills into ~/.claude,
+# wires PATH, and prints per-intern auth hints.
 set -euo pipefail
 
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BIN="$CLAUDE_DIR/bin"
 
-echo "==> Installing ask-deepseek into $CLAUDE_DIR"
-mkdir -p "$CLAUDE_DIR/bin" "$CLAUDE_DIR/skills/deepseek"
+echo "==> Installing KULI into $CLAUDE_DIR"
+mkdir -p "$BIN" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/mcp"
 
-install -m 0755 "$SRC/bin/ask-deepseek.py" "$CLAUDE_DIR/bin/ask-deepseek.py"
-ln -sf "$CLAUDE_DIR/bin/ask-deepseek.py" "$CLAUDE_DIR/bin/ask-deepseek"
-install -m 0755 "$SRC/bin/ask-deepseek-batch.py" "$CLAUDE_DIR/bin/ask-deepseek-batch.py"
-ln -sf "$CLAUDE_DIR/bin/ask-deepseek-batch.py" "$CLAUDE_DIR/bin/ask-deepseek-batch"
-install -m 0644 "$SRC/skills/deepseek/SKILL.md" "$CLAUDE_DIR/skills/deepseek/SKILL.md"
+# Shared package: launchers do `sys.path.insert(0, <their dir>)` then import
+# `kuli`, so the package lives right next to them in ~/.claude/bin.
+rm -rf "$BIN/kuli"
+cp -r "$SRC/kuli" "$BIN/kuli"
+find "$BIN/kuli" -name '__pycache__' -type d -prune -exec rm -rf {} +
 
-# Wire PATH into the user's shell rc (bash + zsh), once.
+# Launchers.
+for f in "$SRC"/bin/*; do
+  install -m 0755 "$f" "$BIN/$(basename "$f")"
+done
+
+# Skills (one per intern).
+for s in deepseek gemini codex; do
+  if [ -f "$SRC/skills/$s/SKILL.md" ]; then
+    mkdir -p "$CLAUDE_DIR/skills/$s"
+    install -m 0644 "$SRC/skills/$s/SKILL.md" "$CLAUDE_DIR/skills/$s/SKILL.md"
+  fi
+done
+
+# Optional unified MCP server.
+[ -f "$SRC/mcp/server.py" ] && install -m 0644 "$SRC/mcp/server.py" "$CLAUDE_DIR/mcp/kuli-server.py"
+
+# Wire PATH into bash + zsh, once.
 add_path() {
   local rc="$1"
   [ -f "$rc" ] || return 0
-  grep -q 'claude/bin (ask-deepseek)' "$rc" && return 0
+  grep -q 'claude/bin (kuli)' "$rc" && return 0
   {
     echo ''
-    echo '# claude/bin (ask-deepseek)'
+    echo '# claude/bin (kuli)'
     echo 'export PATH="$HOME/.claude/bin:$PATH"'
-    echo '# export OPENROUTER_API_KEY="sk-or-..."   # <-- paste your OpenRouter key'
+    echo '# export OPENROUTER_API_KEY="sk-or-..."   # <-- for ask-deepseek'
   } >> "$rc"
   echo "==> Added PATH to $rc"
 }
 add_path "$HOME/.bashrc"
 add_path "$HOME/.zshrc"
 
-echo ""
-echo "Done. CLI: $CLAUDE_DIR/bin/ask-deepseek   Skill: /deepseek"
-if [ -z "${OPENROUTER_API_KEY:-}" ]; then
-  echo ""
-  echo "NEXT: set your OpenRouter key (get one at https://openrouter.ai/keys):"
-  echo '  export OPENROUTER_API_KEY="sk-or-..."'
-  echo "  (uncomment the line just added to your ~/.bashrc to persist it)"
-fi
-echo ""
-echo "Test:  OPENROUTER_API_KEY=sk-or-... ask-deepseek --flash 'say PONG'"
+cat <<'DONE'
+
+Done. Interns installed:
+  ask-deepseek  (text/bulk)   skill: /deepseek
+  ask-gemini    (vision)      skill: /gemini
+  ask-codex     (coding)      skill: /codex
+plus their -batch variants.
+
+AUTH per intern:
+  deepseek -> export OPENROUTER_API_KEY="sk-or-..."   (https://openrouter.ai/keys)
+  gemini   -> run `gemini login`   (OAuth)
+  codex    -> run `codex login`    (ChatGPT) or export OPENAI_API_KEY
+
+Test:
+  ask-deepseek --flash 'say PONG'
+  ask-gemini 'say PONG'
+  ask-codex  'reply one word: PONG'
+DONE

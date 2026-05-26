@@ -1,40 +1,29 @@
-#!/usr/bin/env python3
-"""ask-deepseek — call DeepSeek V4 via OpenRouter. Stdlib only.
+"""kuli.deepseek — text/bulk intern. Calls DeepSeek V4 via OpenRouter.
 
-Usage:
-  ask-deepseek "prompt text"
-  echo "prompt" | ask-deepseek
-  ask-deepseek --file notes.md "summarize this"
-  ask-deepseek --flash "cheap quick task"
-  ask-deepseek --system "You are a researcher" "question"
-
-Env:
-  OPENROUTER_API_KEY   required
-  DEEPSEEK_MODEL       optional, overrides default model
-
+Backend: OpenRouter chat-completions HTTP API. Stdlib only.
+Env: OPENROUTER_API_KEY (required), DEEPSEEK_MODEL / DEEPSEEK_MAX_TOKENS /
+DEEPSEEK_TIMEOUT / DEEPSEEK_AUTO_THRESHOLD (optional).
 Exit codes: 0 ok, 1 usage/input error, 2 API error.
 """
 import argparse
-import collections
-import concurrent.futures
 import json
 import os
 import sys
 import urllib.error
 import urllib.request
 
+from . import core
+
+PROG = "ask-deepseek"
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL_PRO = "deepseek/deepseek-v4-pro"
 MODEL_FLASH = "deepseek/deepseek-v4-flash"
 
-
-def die(msg, code):
-    print(f"ask-deepseek: {msg}", file=sys.stderr)
-    sys.exit(code)
+die = core.make_die(PROG)
 
 
 def parse_args():
-    p = argparse.ArgumentParser(add_help=True, description="Call DeepSeek V4 via OpenRouter.")
+    p = argparse.ArgumentParser(prog=PROG, description="Call DeepSeek V4 via OpenRouter.")
     p.add_argument("prompt", nargs="*", help="prompt text (else read stdin)")
     p.add_argument("--file", "-f", help="prepend file contents to prompt")
     p.add_argument("--system", "-s", help="system prompt")
@@ -47,22 +36,20 @@ def parse_args():
                    help="self-consistency: sample N, majority-vote the answer, flag disagreement")
     p.add_argument("--max-tokens", type=int,
                    default=int(os.environ.get("DEEPSEEK_MAX_TOKENS", "262144")),
-                   help="max OUTPUT tokens (default 16384, env DEEPSEEK_MAX_TOKENS)")
-    p.add_argument("--reasoning", "-r", nargs="?", const="high",
-                   choices=["high", "xhigh"],
+                   help="max OUTPUT tokens (env DEEPSEEK_MAX_TOKENS)")
+    p.add_argument("--reasoning", "-r", nargs="?", const="high", choices=["high", "xhigh"],
                    help="enable thinking mode (effort high|xhigh; bare = high)")
     p.add_argument("--json", action="store_true", help="request JSON object output")
     p.add_argument("--show-thinking", action="store_true",
-                   help="also print the reasoning/thinking process, not just the final answer")
+                   help="also print the reasoning process, not just the final answer")
     p.add_argument("--timeout", type=int,
                    default=int(os.environ.get("DEEPSEEK_TIMEOUT", "600")),
-                   help="HTTP timeout seconds (default 600, env DEEPSEEK_TIMEOUT)")
+                   help="HTTP timeout seconds (env DEEPSEEK_TIMEOUT)")
     p.add_argument("--quiet", "-q", action="store_true", help="suppress usage stats on stderr")
     return p.parse_args()
 
 
 def auto_model(text, system):
-    """Heuristic: small/simple input -> cheap flash, large -> capable pro."""
     threshold = int(os.environ.get("DEEPSEEK_AUTO_THRESHOLD", "1500"))
     est_tokens = (len(text) + len(system or "")) // 4
     return MODEL_PRO if est_tokens > threshold else MODEL_FLASH
@@ -90,23 +77,21 @@ def build_prompt(args):
             die(f"cannot read --file: {e}", 1)
     if args.prompt:
         parts.append(" ".join(args.prompt))
-    elif not sys.stdin.isatty():
-        parts.append(sys.stdin.read())
+    else:
+        piped = core.read_stdin()
+        if piped:
+            parts.append(piped)
     text = "\n\n".join(p for p in parts if p.strip())
     if not text.strip():
         die("empty prompt (pass args, --file, or pipe stdin)", 1)
     return text
 
 
-def build_messages(system, user):
-    msgs = []
-    if system:
-        msgs.append({"role": "system", "content": system})
-    msgs.append({"role": "user", "content": user})
-    return msgs
-
-
-def build_payload(args, model, messages):
+def build_payload(args, model, user):
+    messages = []
+    if args.system:
+        messages.append({"role": "system", "content": args.system})
+    messages.append({"role": "user", "content": user})
     payload = {
         "model": model,
         "messages": messages,
@@ -121,15 +106,15 @@ def build_payload(args, model, messages):
     return payload
 
 
-def call_api(payload, key, timeout=600):
+def call_api(payload, key, timeout):
     req = urllib.request.Request(
         API_URL,
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://claude-code.local/ask-deepseek",
-            "X-Title": "ask-deepseek",
+            "HTTP-Referer": "https://claude-code.local/kuli",
+            "X-Title": "kuli-ask-deepseek",
         },
         method="POST",
     )
@@ -145,7 +130,7 @@ def call_api(payload, key, timeout=600):
 
 
 def extract(data):
-    """Return (final_answer, thinking, usage). thinking may be empty."""
+    """Return (final_answer, thinking, usage)."""
     try:
         msg = data["choices"][0]["message"]
     except (KeyError, IndexError):
@@ -169,32 +154,12 @@ def format_usage(model, usage):
     return line + "]"
 
 
-def vote_key(text):
-    """Answer proxy for voting: normalized last non-empty line."""
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
-    last = lines[-1] if lines else text
-    return "".join(ch.lower() for ch in last if ch.isalnum())[:120]
-
-
 def sum_usage(usages):
-    total = collections.Counter()
+    total = {"prompt_tokens": 0, "completion_tokens": 0}
     for u in usages:
         total["prompt_tokens"] += u.get("prompt_tokens", 0)
         total["completion_tokens"] += u.get("completion_tokens", 0)
-    return dict(total)
-
-
-def run_consistency(payload, key, n, timeout=600):
-    def one(_):
-        final, _think, usage = extract(call_api(payload, key, timeout))
-        return final, usage
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(n, 8)) as pool:
-        results = list(pool.map(one, range(n)))
-    contents = [c for c, _ in results]
-    keys = [vote_key(c) for c in contents]
-    win_key, votes = collections.Counter(keys).most_common(1)[0]
-    rep = next(c for c, k in zip(contents, keys) if k == win_key)
-    return rep, votes, sum_usage([u for _, u in results])
+    return total
 
 
 def main():
@@ -206,23 +171,24 @@ def main():
     model = resolve_model(args, user)
     if args.temperature is None:
         args.temperature = 0.8 if args.consistency else 0.7
-    payload = build_payload(args, model, build_messages(args.system, user))
+    payload = build_payload(args, model, user)
+
+    def sample():
+        final, _thinking, usage = extract(call_api(payload, key, args.timeout))
+        return final, usage
+
     n = args.consistency
     if n and n > 1:
-        content, votes, usage = run_consistency(payload, key, n, args.timeout)
+        content, votes, usages = core.run_consistency(sample, n)
+        usage = sum_usage(usages)
     else:
         content, thinking, usage = extract(call_api(payload, key, args.timeout))
         votes = None
         if args.show_thinking and thinking:
             print(f"<thinking>\n{thinking}\n</thinking>\n")
     print(content)
-    if not args.quiet:
-        line = format_usage(model, usage) if usage else ""
-        if votes is not None:
-            agree = f"agreement {votes}/{n}" + ("  ⚠ LOW — verify" if votes * 2 <= n else "")
-            line = f"{line} | {agree}" if line else f"[{agree}]"
-        if line:
-            print(line, file=sys.stderr)
+    base = format_usage(model, usage) if usage else ""
+    core.emit_stats(base, votes, n, args.quiet)
 
 
 if __name__ == "__main__":

@@ -38,6 +38,27 @@ The intern protocol — every delegation follows it:
 4. **Integrate** — use the validated result, and say it was an intern draft you
    reviewed.
 
+### Docs are not ground truth (feed code, not marketing)
+
+The intern believes whatever you hand it. If you bundle a README/spec and ask
+"what does this project do?", it reports the doc's *claims* as implemented fact —
+README says "multi-tenancy + RBAC", intern reports multi-tenancy even when the
+schema has a single `role` column and zero `organization` references. Garbage in,
+garbage out.
+
+- **For "is X implemented / how does X work?" questions, the evidence is code**,
+  not docs. Bundle the real source: schema files, router/handler files, grep
+  counts, dep lists. `-f spec.md` answers "what was *planned*", never "what *is*".
+- **Separate the two in the brief.** Label sections `SPEC CLAIMS (unverified —
+  check against code)` vs `VERIFIED FROM CODE`. Tell the intern to treat spec
+  claims as hypotheses and flag any mismatch with the code — don't blend them into
+  one authoritative blob.
+- **Narrow the question** so there's no gap to fill with assumptions: "given THIS
+  schema, what RBAC exists?" beats "research this project".
+- **You verify factual impl claims before relaying.** Any "X is built / X works"
+  the intern asserts → grep/read the repo and confirm. This is the review gate's
+  whole point; it's what catches the doc-vs-reality drift above.
+
 ### Protect your own context (token discipline)
 
 Delegating already saves *your* input tokens — the intern reads the big file, you

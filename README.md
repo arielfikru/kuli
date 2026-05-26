@@ -1,255 +1,148 @@
-# claude-ask-deepseek
+# KULI — Kana Unified LLM Interns
 
-Give your AI coding agent (Claude Code) a cheap **intern**: it hands well-scoped
-grunt work to **DeepSeek V4** via [OpenRouter](https://openrouter.ai), then
-reviews the output before anything ships.
+Give your AI coding agent (Claude Code) a pool of cheap **interns**. Claude stays
+the senior — it scopes the work, hands it to the right intern, then **reviews the
+output before anything ships**. KULI bundles three interns behind one consistent
+CLI vocabulary and one optional MCP server:
 
-**The intern model.** The agent is the senior; DeepSeek is the intern working
-under it: the senior briefs the task and bundles the context (the intern has no
-repo memory), the intern grinds (research, summarizing, drafting, extraction,
-classification, brainstorming) at a fraction of the cost, and the senior
-**reviews and corrects** before using the result — never merges it blind. Hard
-or correctness-critical calls stay with the senior. OpenRouter prompt caching is
-automatic (~0.25x for cached tokens), and the intern can `--reasoning` (thinking
-mode) when a task needs real thought.
+| Intern | CLI | Niche | Backend |
+|--------|-----|-------|---------|
+| **deepseek** | `ask-deepseek` | cheap text / bulk reasoning | OpenRouter (DeepSeek V4) |
+| **gemini** | `ask-gemini` | vision — sees images & video | Gemini CLI (gemini-3.1-pro) |
+| **codex** | `ask-codex` | agentic coding — Q&A or file edits | OpenAI Codex (`codex exec`) |
 
-## Install — just tell your agent
+Each has a `-batch` variant for parallel fan-out. All share one core
+(`kuli/core.py`): prompt assembly, self-consistency voting, the stats line, and
+batch fan-out are written once and behave identically across interns.
 
-Paste this to Claude Code (or any agent that can run shell + clone repos):
+## Why three, not one
 
-```
-Install ini https://github.com/arielfikru/claude-ask-deepseek
-```
+They are genuinely different tools, not skins of one model:
 
-The agent reads [`INSTALL.md`](INSTALL.md) and sets itself up. That's it.
+- **deepseek** is text-only and cheap — research, summarizing, drafting, bulk
+  transforms.
+- **gemini** is the only one that can *see* pixels/frames — screenshots, UI bugs,
+  video, OCR.
+- **codex** reads a real repo and (with `--apply`) edits files in a sandbox —
+  code review and scoped implementation.
 
-### Manual install
+Different backends, auth, and capabilities — so they stay separate engines under
+a shared core, rather than one confused mega-binary.
 
-> **No `npm install` / `pip install` needed.** The CLI is a single stdlib-Python
-> script (Python 3.8+, zero dependencies). `install.sh` just copies it into
-> `~/.claude/bin` and adds that to your PATH. The only optional dependency is the
-> `mcp` package, and only if you want the [MCP server](#mcp-server-optional).
-
-```bash
-git clone --depth 1 https://github.com/arielfikru/claude-ask-deepseek.git
-bash claude-ask-deepseek/install.sh
-export OPENROUTER_API_KEY="sk-or-..."   # see "Getting an API key" below
-ask-deepseek --flash "Reply with exactly: PONG"
-```
-
-### Getting an API key
-
-The intern runs on [OpenRouter](https://openrouter.ai), which proxies DeepSeek V4
-(so you get caching + reasoning + a single key for many models).
-
-1. Sign up at <https://openrouter.ai>.
-2. Open <https://openrouter.ai/keys> and **Create Key**. Optionally set a credit
-   limit on the key (recommended — caps your spend).
-3. Add a few dollars of credit (DeepSeek V4 is cheap; see [cost](#cost--rate-limits--timeouts)).
-4. Export it: `export OPENROUTER_API_KEY="sk-or-..."` — persist it by uncommenting
-   the line `install.sh` added to your `~/.bashrc`.
-
-You do **not** need a key from DeepSeek directly; OpenRouter handles the upstream.
-
-## What gets installed
-
-| Path | What |
-| ---- | ---- |
-| `~/.claude/bin/ask-deepseek` | the CLI (stdlib Python, zero deps) |
-| `~/.claude/skills/deepseek/SKILL.md` | the `/deepseek` skill: when/how the agent delegates |
-| `~/.bashrc` (+`~/.zshrc`) | adds `~/.claude/bin` to PATH, key placeholder |
-
-## CLI usage
+## Install
 
 ```bash
-ask-deepseek "summarize the tradeoffs of WAL vs rollback journaling"
-cat report.md | ask-deepseek "extract every action item as a bullet"
-ask-deepseek -f src/big.py "list every public function and its purpose"
-ask-deepseek --flash "cheap quick task"               # v4-flash instead of v4-pro
-ask-deepseek --auto "route me by size"                # small->flash, large->pro
-ask-deepseek -r high "tricky logic/math problem"      # thinking mode (or -r xhigh)
-ask-deepseek -r high --show-thinking "..."            # also print the reasoning
-ask-deepseek -s "You are a data extractor" --json "return {name,email} from: ..."
+git clone <repo-url> kuli && cd kuli
+bash install.sh
 ```
 
-### What it looks like
+This copies the `kuli` package + thin launchers into `~/.claude/bin`, installs
+the three skills into `~/.claude/skills/`, and wires `~/.claude/bin` onto PATH.
 
-```console
-$ ask-deepseek --flash "Reply with exactly: PONG"
-PONG
-[deepseek/deepseek-v4-flash | in 10 out 3 tok]
-
-$ ask-deepseek --flash -c 5 "Capital of Australia? Reply ONLY the city."
-Canberra
-[deepseek/deepseek-v4-flash | in 75 out 125 tok | agreement 5/5]
-
-$ ask-deepseek --flash -r high --show-thinking "What is 17*23? Reply ONLY the number."
-<thinking>
-We compute 17*23 = 391. Reply with only 391.
-</thinking>
-
-391
-[deepseek/deepseek-v4-flash | in 23 out 412 tok]
-```
-
-> The stats line (model, token in/out, cache hits, vote agreement) is printed on
-> **stderr**, so piping `ask-deepseek ... | next-tool` passes only the clean
-> answer. Want to record a GIF for your fork? `vhs` or `asciinema` work well.
-
-| Flag | Meaning |
-| ---- | ------- |
-| `--flash` | use `deepseek/deepseek-v4-flash` (cheaper) instead of `-pro` |
-| `--reasoning`, `-r [high\|xhigh]` | enable thinking mode (bare = high) — big accuracy gain on hard reasoning |
-| `--consistency`, `-c N` | self-consistency: sample N, majority-vote, report agreement + flag disagreement |
-| `--show-thinking` | also print the reasoning process (off by default — final answer only) |
-| `--timeout SEC` | HTTP timeout, default 600 (env `DEEPSEEK_TIMEOUT`) — raise for long `xhigh` runs |
-| `-m SLUG` | explicit OpenRouter model slug |
-| `-s TEXT` | system prompt |
-| `-f FILE` | prepend file contents to the prompt |
-| `-t N` | temperature (default 0.7) |
-| `--max-tokens N` | max **output** tokens (default 262144, env `DEEPSEEK_MAX_TOKENS`) |
-| `--json` | request a JSON object response |
-| `-q` | suppress the usage/cost line on stderr |
-
-Models: `deepseek/deepseek-v4-pro` (default), `deepseek/deepseek-v4-flash`.
-Override the default via `DEEPSEEK_MODEL` env var.
-
-> **Context vs output:** DeepSeek V4 has a **1M-token context window** — that's
-> the *input* budget, so you can feed huge files via `-f`. `--max-tokens` caps
-> only the **generated output** (default 262144). The cap is just a ceiling — the
-> model bills every token it actually generates, so the default rarely matters
-> unless a prompt makes the model produce a very long answer. Lower it
-> (`--max-tokens 8192` or `DEEPSEEK_MAX_TOKENS`) to hard-limit cost.
-
-## Auto-routing
-
-`--auto` picks the model by estimated input size: small/simple prompts go to
-`flash` (cheap), large ones to `pro` (capable). Threshold is `1500` estimated
-tokens, override via `DEEPSEEK_AUTO_THRESHOLD`.
+### Auth (per intern)
 
 ```bash
-ask-deepseek --auto "Say hi"            # -> v4-flash
-ask-deepseek --auto -f huge_doc.md "analyze"   # -> v4-pro
+export OPENROUTER_API_KEY="sk-or-..."   # deepseek  (https://openrouter.ai/keys)
+gemini login                            # gemini    (OAuth)
+codex login                             # codex     (ChatGPT) — or export OPENAI_API_KEY
 ```
 
-## Reasoning (thinking mode)
-
-DeepSeek V4 supports a thinking mode that produces internal reasoning before the
-answer — a large, measured accuracy gain on hard math/logic/analysis. Enable it
-with `--reasoning`/`-r` (`high`, or `xhigh` for max effort). It costs more output
-tokens (the thinking is billed), so use it only when a task genuinely needs it.
+### Smoke test
 
 ```bash
-ask-deepseek -r high  "Find ordered pairs (a,b), a+b=1000, no digit 0."   # -> 738
-ask-deepseek -r xhigh -f spec.md "review this design for race conditions"
+ask-deepseek --flash 'say PONG'
+ask-gemini -f screenshot.png 'what UI bug is visible?'
+ask-codex 'reply one word: PONG'
 ```
 
-By default only the **final answer** prints; add `--show-thinking` to also see the
-reasoning (wrapped in `<thinking>…</thinking>`). The thinking is generated and
-**billed** either way — the flag only controls whether it's displayed.
+## Usage
 
-## Cost, rate limits & timeouts
-
-**Reasoning makes output long.** With `--reasoning`, the model emits a long
-internal thinking process before the answer, and **every thinking token is billed
-as output**. In testing, one hard problem with `-r high` produced ~14k output
-tokens (and `--consistency N` multiplies that by N). A normal non-reasoning call is
-tiny by comparison. So:
-
-- **Estimate before you fan out.** The stderr stats line shows `out N tok` per
-  call — reasoning: assume thousands; non-reasoning: tens to hundreds.
-  `--consistency N` and `ask-deepseek-batch` multiply cost by N; start with
-  `--flash` and small N.
-- **Cap spend at the source.** Set a credit limit on the OpenRouter key, and use
-  `--max-tokens` (or `DEEPSEEK_MAX_TOKENS`) to hard-ceiling output per call.
-- **Caching cuts repeat cost** — re-use the same `-s`/`-f` prefix (~0.25x, see
-  [Caching](#caching)).
-- **Default to the cheap intern** — `--flash`/`--auto`; reserve `-pro` + `-r xhigh`
-  for genuinely hard work.
-
-**Timeouts.** Long `xhigh` runs take a while. The CLI waits up to **600s** by
-default; raise with `--timeout 900` or `DEEPSEEK_TIMEOUT`. On timeout you get a
-clear error (`timed out after Ns — raise --timeout or lower --reasoning effort`),
-not a hang. OpenRouter **rate limits** (HTTP 429) surface verbatim on stderr —
-lower concurrency (`-j` in batch) or retry.
-
-## Self-consistency (automatic review gate)
-
-`--consistency N` (`-c N`) samples the answer N times (higher temperature),
-majority-votes, and prints `agreement X/N` on stderr — flagging `⚠ LOW` when
-there's no majority so you know to verify. This is an evidence-backed gate
-(+9–15% accuracy in the literature) that works best on short / factual / numeric
-answers; it's not useful for long prose (every sample differs). It costs N×
-output tokens.
+### deepseek — text / bulk
 
 ```bash
-ask-deepseek --flash -c 5 "Capital of Australia? Reply ONLY the city."
-# -> Canberra        [stderr: ... | agreement 5/5]
+ask-deepseek "summarize WAL vs rollback journaling"
+ask-deepseek -f report.md "extract every action item as a bullet"
+ask-deepseek --flash "rewrite formally: ..."          # cheap model
+ask-deepseek -r high "tricky logic problem"           # thinking mode
+ask-deepseek -c 5 "Capital of Australia? city only"   # self-consistency vote
+printf 'tldr A\ntldr B\n' | ask-deepseek-batch --flash -j 8
 ```
 
-## Batch fan-out
+Flags: `--flash` / `--auto` / `-m`, `-r [high|xhigh]`, `-s SYSTEM`, `-f FILE`,
+`-c N`, `--json`, `--show-thinking`, `--timeout`, `-q`.
 
-`ask-deepseek-batch` runs many prompts in parallel, reusing one cached prefix
-(shared `--system`/`--context`), so cost drops after the first call.
+### gemini — vision
 
 ```bash
-# one prompt per line on stdin
-printf 'tldr A\ntldr B\ntldr C\n' | ask-deepseek-batch --flash -j 8
-
-# shared context file (cached), auto-route each question
-ask-deepseek-batch -c report.md --auto < questions.txt
-
-# multiline prompts split on a delimiter line, JSON output
-ask-deepseek-batch -d '---' --json < prompts.txt > out.json
+ask-gemini -f shot.png "what UI bug is visible?"
+ask-gemini -f clip.mp4 "summarize with timestamps"
+ask-gemini -f before.png -f after.png "what changed?"
+ask-gemini-batch -p "any layout issue?" shots/*.png -j 8
 ```
 
-| Flag | Meaning |
-| ---- | ------- |
-| `-s TEXT` | shared system prompt (cached prefix) |
-| `-c FILE` | shared context file (cached prefix) |
-| `-d STR` | split prompts on this delimiter line (default: one per line) |
-| `-j N` | parallel workers (default 4) |
-| `--flash` / `--auto` / `-r` / `-m` / `-t` / `--max-tokens` | applied to every prompt |
-| `--json` | emit a JSON array of `{index, prompt, output, ok}` |
+Flags: `-f FILE` (repeatable), `--flash` / `--pro` / `-m`, `-c N`, `--raw`,
+`--timeout`, `-q`. Runs from an empty temp dir so each call stays lean (~8k vs
+~90k tokens).
 
-## Caching
-
-DeepSeek caching on OpenRouter is automatic — no `cache_control` breakpoints.
-Cached prompt tokens bill at ~0.25x. The cache keys on the request **prefix**, so
-keep the stable part (same `-s SYSTEM` / `-f FILE`) identical and put the varying
-question last (the CLI already orders system → file → prompt). The usage line
-reports cache hits:
-
-```
-[deepseek/deepseek-v4-flash | in 1213 out 39 tok | cached 509 (~0.25x)]
-```
-
-## MCP server (optional)
-
-The CLI is the engine and works in any shell. If you want the intern exposed as
-**native MCP tools** (no shell spawn, typed args) in an MCP-aware client, there's
-a thin wrapper in [`mcp/server.py`](mcp/server.py) that just shells out to the
-same CLI — so caching, reasoning, consistency, and batch all still apply.
+### codex — coding (read-only & agentic)
 
 ```bash
-pip install -r mcp/requirements.txt          # needs the `mcp` package
-# register in Claude Code (user scope), passing the key as env:
-claude mcp add deepseek --scope user \
-  -e OPENROUTER_API_KEY="sk-or-..." \
-  -- python3 /abs/path/to/claude-ask-deepseek/mcp/server.py
+# read-only (safe): code review / questions about a repo
+ask-codex "review the auth middleware for races"
+ask-codex -f spec.md "does src/ implement this spec?"
+
+# agentic: edits files — do it in a throwaway worktree, then review the diff
+git worktree add ../wt-codex HEAD
+ask-codex --apply --cd ../wt-codex "add validation to the season router"
+# inspect ../wt-codex diff, keep what's good, remove the worktree
+
+ask-codex-batch --cd apps/api < questions.txt    # read-only fan-out
 ```
 
-Tools exposed: `ask_deepseek(prompt, model, reasoning, system, consistency,
-context_file, max_tokens)` and `ask_deepseek_batch(prompts, ...)`. Prefer the CLI
-for portability; reach for MCP only when an agent can't spawn a shell or you want
-the harness to validate tool args.
+Flags: `--apply` (write mode; default read-only), `--cd DIR`, `-f FILE`,
+`-i IMAGE`, `-m`, `-c N` (read-only only), `--timeout`, `--json`, `-q`.
+Danger sandbox modes are intentionally not exposed.
 
-## Requirements
+## The intern protocol (every call)
 
-- Python 3.8+ (stdlib only — no pip installs)
-- An OpenRouter API key
-- Optional: Claude Code, for the `/deepseek` skill auto-trigger
+1. **Brief** — the intern has no repo memory; bundle what it needs (`-f`, `--cd`).
+   For "is X implemented?" feed **code**, not docs — docs report intent, not reality.
+2. **Assign** — pick the right intern + cheapest model that works.
+3. **Review (mandatory)** — spot-check claims; for `ask-codex --apply`, review
+   the diff. Interns hallucinate and overreach — never ship blind.
+4. **Integrate** — use the validated result; note it was an intern draft.
 
-## License
+## Self-consistency (`-c N`)
 
-MIT
+Samples N times and majority-votes the answer, printing `agreement V/N` (with
+`⚠ LOW` when ≤ half agree). Use only when the answer is a single short verifiable
+value and being wrong is costly. Skip for prose/code (every sample differs) or
+when you can verify it yourself. It is N× the tokens — never the default.
+
+## MCP (optional)
+
+A single MCP server exposes all interns as typed tools:
+
+```bash
+claude mcp add kuli -- python3 /abs/path/to/mcp/server.py
+```
+
+Tools: `ask_deepseek`, `ask_deepseek_batch`, `ask_gemini`, `ask_gemini_batch`,
+`ask_codex`, `ask_codex_batch`. The CLIs remain the source of truth; the server
+only shells out to them.
+
+## Layout
+
+```
+kuli/
+├── kuli/            # shared package
+│   ├── core.py      # voting, stats, batch fan-out, prompt helpers
+│   ├── deepseek.py  gemini.py  codex.py          # ask-* adapters
+│   └── *_batch.py                                 # ask-*-batch adapters
+├── bin/             # thin launchers (import kuli.<mod>:main)
+├── skills/          # /deepseek /gemini /codex
+├── mcp/server.py    # unified MCP server
+└── install.sh
+```
+
+Stdlib only — no third-party Python deps (the MCP server needs `mcp` if used).
