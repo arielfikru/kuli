@@ -53,7 +53,7 @@ ask-deepseek -s "You are a data extractor" --json "return {name,email} from: ...
 | `-s TEXT` | system prompt |
 | `-f FILE` | prepend file contents to the prompt |
 | `-t N` | temperature (default 0.7) |
-| `--max-tokens N` | max **output** tokens (default 16384, env `DEEPSEEK_MAX_TOKENS`) |
+| `--max-tokens N` | max **output** tokens (default 262144, env `DEEPSEEK_MAX_TOKENS`) |
 | `--json` | request a JSON object response |
 | `-q` | suppress the usage/cost line on stderr |
 
@@ -62,9 +62,10 @@ Override the default via `DEEPSEEK_MODEL` env var.
 
 > **Context vs output:** DeepSeek V4 has a **1M-token context window** — that's
 > the *input* budget, so you can feed huge files via `-f`. `--max-tokens` caps
-> only the **generated output** (default 16384). You can raise it
-> (`--max-tokens 100000` or `DEEPSEEK_MAX_TOKENS`), but the model bills every
-> token it actually generates, so a high cap on a rambling prompt costs more.
+> only the **generated output** (default 262144). The cap is just a ceiling — the
+> model bills every token it actually generates, so the default rarely matters
+> unless a prompt makes the model produce a very long answer. Lower it
+> (`--max-tokens 8192` or `DEEPSEEK_MAX_TOKENS`) to hard-limit cost.
 
 ## Auto-routing
 

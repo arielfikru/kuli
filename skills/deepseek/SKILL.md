@@ -30,7 +30,7 @@ ask-deepseek -s "You are a data extractor" --json "return {name,email} from: ...
 
 Flags: `--flash` (v4-flash, cheap), `--auto` (route by input size: small→flash,
 large→pro; threshold `DEEPSEEK_AUTO_THRESHOLD` tokens, default 1500), `-m SLUG`,
-`-s SYSTEM`, `-f FILE`, `-t TEMP`, `--max-tokens N` (output cap, default 16384,
+`-s SYSTEM`, `-f FILE`, `-t TEMP`, `--max-tokens N` (output cap, default 262144,
 env `DEEPSEEK_MAX_TOKENS`), `--json`, `-q` (no stats). Models:
 `deepseek/deepseek-v4-pro` (default), `deepseek/deepseek-v4-flash`. Context
 window is 1M tokens (input) — feed big files via `-f`; output is capped by

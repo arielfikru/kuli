@@ -42,7 +42,7 @@ def parse_args():
                    help="auto-pick flash (small input) vs pro (large), by token estimate")
     p.add_argument("--temperature", "-t", type=float, default=0.7)
     p.add_argument("--max-tokens", type=int,
-                   default=int(os.environ.get("DEEPSEEK_MAX_TOKENS", "16384")),
+                   default=int(os.environ.get("DEEPSEEK_MAX_TOKENS", "262144")),
                    help="max OUTPUT tokens (default 16384, env DEEPSEEK_MAX_TOKENS)")
     p.add_argument("--json", action="store_true", help="request JSON object output")
     p.add_argument("--quiet", "-q", action="store_true", help="suppress usage stats on stderr")
