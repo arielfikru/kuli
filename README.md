@@ -56,6 +56,7 @@ ask-deepseek -s "You are a data extractor" --json "return {name,email} from: ...
 | ---- | ------- |
 | `--flash` | use `deepseek/deepseek-v4-flash` (cheaper) instead of `-pro` |
 | `--reasoning`, `-r [high\|xhigh]` | enable thinking mode (bare = high) — big accuracy gain on hard reasoning |
+| `--consistency`, `-c N` | self-consistency: sample N, majority-vote, report agreement + flag disagreement |
 | `-m SLUG` | explicit OpenRouter model slug |
 | `-s TEXT` | system prompt |
 | `-f FILE` | prepend file contents to the prompt |
@@ -97,6 +98,20 @@ ask-deepseek -r high  "Find ordered pairs (a,b), a+b=1000, no digit 0."   # -> 7
 ask-deepseek -r xhigh -f spec.md "review this design for race conditions"
 ```
 
+## Self-consistency (automatic review gate)
+
+`--consistency N` (`-c N`) samples the answer N times (higher temperature),
+majority-votes, and prints `agreement X/N` on stderr — flagging `⚠ LOW` when
+there's no majority so you know to verify. This is an evidence-backed gate
+(+9–15% accuracy in the literature) that works best on short / factual / numeric
+answers; it's not useful for long prose (every sample differs). It costs N×
+output tokens.
+
+```bash
+ask-deepseek --flash -c 5 "Capital of Australia? Reply ONLY the city."
+# -> Canberra        [stderr: ... | agreement 5/5]
+```
+
 ## Batch fan-out
 
 `ask-deepseek-batch` runs many prompts in parallel, reusing one cached prefix
@@ -133,6 +148,26 @@ reports cache hits:
 ```
 [deepseek/deepseek-v4-flash | in 1213 out 39 tok | cached 509 (~0.25x)]
 ```
+
+## MCP server (optional)
+
+The CLI is the engine and works in any shell. If you want the intern exposed as
+**native MCP tools** (no shell spawn, typed args) in an MCP-aware client, there's
+a thin wrapper in [`mcp/server.py`](mcp/server.py) that just shells out to the
+same CLI — so caching, reasoning, consistency, and batch all still apply.
+
+```bash
+pip install -r mcp/requirements.txt          # needs the `mcp` package
+# register in Claude Code (user scope), passing the key as env:
+claude mcp add deepseek --scope user \
+  -e OPENROUTER_API_KEY="sk-or-..." \
+  -- python3 /abs/path/to/claude-use-deepseek/mcp/server.py
+```
+
+Tools exposed: `ask_deepseek(prompt, model, reasoning, system, consistency,
+context_file, max_tokens)` and `ask_deepseek_batch(prompts, ...)`. Prefer the CLI
+for portability; reach for MCP only when an agent can't spawn a shell or you want
+the harness to validate tool args.
 
 ## Requirements
 

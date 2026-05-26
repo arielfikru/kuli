@@ -15,6 +15,8 @@ Env:
 Exit codes: 0 ok, 1 usage/input error, 2 API error.
 """
 import argparse
+import collections
+import concurrent.futures
 import json
 import os
 import sys
@@ -40,7 +42,9 @@ def parse_args():
     p.add_argument("--flash", action="store_true", help="use cheaper v4-flash")
     p.add_argument("--auto", action="store_true",
                    help="auto-pick flash (small input) vs pro (large), by token estimate")
-    p.add_argument("--temperature", "-t", type=float, default=0.7)
+    p.add_argument("--temperature", "-t", type=float, default=None)
+    p.add_argument("--consistency", "-c", type=int, metavar="N",
+                   help="self-consistency: sample N, majority-vote the answer, flag disagreement")
     p.add_argument("--max-tokens", type=int,
                    default=int(os.environ.get("DEEPSEEK_MAX_TOKENS", "262144")),
                    help="max OUTPUT tokens (default 16384, env DEEPSEEK_MAX_TOKENS)")
@@ -156,6 +160,33 @@ def format_usage(model, usage):
     return line + "]"
 
 
+def vote_key(text):
+    """Answer proxy for voting: normalized last non-empty line."""
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    last = lines[-1] if lines else text
+    return "".join(ch.lower() for ch in last if ch.isalnum())[:120]
+
+
+def sum_usage(usages):
+    total = collections.Counter()
+    for u in usages:
+        total["prompt_tokens"] += u.get("prompt_tokens", 0)
+        total["completion_tokens"] += u.get("completion_tokens", 0)
+    return dict(total)
+
+
+def run_consistency(payload, key, n):
+    def one(_):
+        return extract(call_api(payload, key))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(n, 8)) as pool:
+        results = list(pool.map(one, range(n)))
+    contents = [c for c, _ in results]
+    keys = [vote_key(c) for c in contents]
+    win_key, votes = collections.Counter(keys).most_common(1)[0]
+    rep = next(c for c, k in zip(contents, keys) if k == win_key)
+    return rep, votes, sum_usage([u for _, u in results])
+
+
 def main():
     args = parse_args()
     key = os.environ.get("OPENROUTER_API_KEY")
@@ -163,11 +194,23 @@ def main():
         die("OPENROUTER_API_KEY not set", 1)
     user = build_prompt(args)
     model = resolve_model(args, user)
+    if args.temperature is None:
+        args.temperature = 0.8 if args.consistency else 0.7
     payload = build_payload(args, model, build_messages(args.system, user))
-    content, usage = extract(call_api(payload, key))
+    n = args.consistency
+    if n and n > 1:
+        content, votes, usage = run_consistency(payload, key, n)
+    else:
+        content, usage = extract(call_api(payload, key))
+        votes = None
     print(content)
-    if not args.quiet and usage:
-        print(format_usage(model, usage), file=sys.stderr)
+    if not args.quiet:
+        line = format_usage(model, usage) if usage else ""
+        if votes is not None:
+            agree = f"agreement {votes}/{n}" + ("  ⚠ LOW — verify" if votes * 2 <= n else "")
+            line = f"{line} | {agree}" if line else f"[{agree}]"
+        if line:
+            print(line, file=sys.stderr)
 
 
 if __name__ == "__main__":

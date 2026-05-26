@@ -47,6 +47,9 @@ ask-deepseek --flash "rewrite this sentence formally: ..."
 # make the intern think hard (thinking mode) for a tricky problem
 ask-deepseek -r high "logic/math problem ..."        # or -r xhigh for max effort
 
+# self-consistency: sample 5, majority-vote, flag disagreement (short answers)
+ask-deepseek --flash -c 5 "Capital of Australia? Reply ONLY the city."
+
 # system prompt + JSON output (machine-parseable)
 ask-deepseek -s "You are a data extractor" --json "return {name,email} from: ..."
 ```
@@ -55,8 +58,10 @@ Flags: `--flash` (v4-flash, cheap), `--auto` (route by input size: small→flash
 large→pro; threshold `DEEPSEEK_AUTO_THRESHOLD` tokens, default 1500),
 `--reasoning/-r [high|xhigh]` (thinking mode — bare = high; big accuracy gain on
 hard reasoning, costs more output tokens), `-m SLUG`, `-s SYSTEM`, `-f FILE`,
-`-t TEMP`, `--max-tokens N` (output cap, default 262144, env
-`DEEPSEEK_MAX_TOKENS`), `--json`, `-q` (no stats). Models:
+`--consistency/-c N` (automatic review gate: sample N, majority-vote the answer,
+print `agreement X/N` + `⚠ LOW` when no majority — best for short/factual/numeric
+answers, not long prose), `-t TEMP`, `--max-tokens N` (output cap, default 262144,
+env `DEEPSEEK_MAX_TOKENS`), `--json`, `-q` (no stats). Models:
 `deepseek/deepseek-v4-pro` (default), `deepseek/deepseek-v4-flash`. Context
 window is 1M tokens (input) — feed big files via `-f`; output is capped by
 `--max-tokens`, not 1M.
