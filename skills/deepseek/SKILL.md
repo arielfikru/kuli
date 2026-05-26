@@ -38,6 +38,23 @@ The intern protocol — every delegation follows it:
 4. **Integrate** — use the validated result, and say it was an intern draft you
    reviewed.
 
+### Protect your own context (token discipline)
+
+Delegating already saves *your* input tokens — the intern reads the big file, you
+don't. But the intern's **output** lands back in your context when you read the
+command result. For large outputs, don't slurp it all:
+
+- Redirect to a file, then read only the slice you need:
+  ```bash
+  ask-deepseek -f bigdoc.md "produce a detailed report" > /tmp/ds_out.md
+  ```
+  Then `Read /tmp/ds_out.md` with `limit`/`offset`, or `grep` for the part that
+  matters — instead of piping the whole thing through your context.
+- Make the intern do the trimming: ask for a tight format up front ("max 200
+  words", "bullets only", "return just the JSON"). Cheaper to constrain the
+  intern than to ingest verbosity and summarize it yourself.
+- Use `-q` to drop the stderr stats line when you don't need cost numbers.
+
 ## Tool
 
 `ask-deepseek` (at `~/.claude/bin/ask-deepseek`). Stdlib Python, no deps.
