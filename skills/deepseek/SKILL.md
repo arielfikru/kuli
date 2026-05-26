@@ -22,6 +22,16 @@ The intern protocol — every delegation follows it:
    - needs to *think hard* (math, logic, tricky analysis) → `--reasoning` /
      `--reasoning xhigh` (thinking mode; measurably more accurate)
    - many similar items → `ask-deepseek-batch` (parallel, shared cached prefix)
+   - **answer is a single short verifiable value AND being wrong is costly**
+     (a number, name, yes/no, classification, picked option) → add `-c 5`
+     (self-consistency vote). Decision rule:
+     - USE `-c` when: factual/numeric/categorical answer + you'd otherwise have to
+       trust it blind (no cheap way to verify). The `agreement X/N` line tells you
+       how much to trust it; `⚠ LOW` = don't.
+     - SKIP `-c` when: output is prose/code/a draft (every sample differs, vote is
+       meaningless), OR you can verify the result yourself anyway (run it, check
+       the repo), OR cost matters more than the extra confidence. It is N× the
+       tokens — never the default.
 3. **Review (mandatory gate)** — read the output, spot-check claims against the
    real repo/source, correct mistakes. The intern hallucinates and overstates;
    never paste its result into user-facing work without verifying.
