@@ -23,7 +23,7 @@ EXT = {"image/svg+xml": "svg", "image/png": "png", "image/jpeg": "jpg", "image/w
 
 
 def parse_args():
-    p = argparse.ArgumentParser(prog=PROG, description="Generate SVG vector graphics (Recraft V4.1).")
+    p = argparse.ArgumentParser(prog=PROG, description="Generate SVG vector graphics.")
     p.add_argument("prompt", nargs="*", help="text prompt (else read stdin)")
     p.add_argument("--image", "-i", help="optional single input image to guide output")
     p.add_argument("--out", "-o", help="output file path (default: auto-named in cwd)")
