@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""KULI launcher for ask-codex-batch — thin entry into kuli.codex_batch:main."""
+"""KULI launcher for kuli — thin entry into kuli.cli:main."""
 import os
 import sys
 
 _bin = os.path.dirname(os.path.realpath(__file__))
 sys.path.insert(0, os.path.join(_bin, "..", "lib"))
-from kuli.codex_batch import main
+from kuli.cli import main
 
 main()

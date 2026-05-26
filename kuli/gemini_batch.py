@@ -27,7 +27,8 @@ def parse_args():
     p.add_argument("--prompt", "-p", help="shared question applied to each file (mode 1)")
     p.add_argument("--context", "-c", help="shared media file for stdin prompts (mode 2)")
     p.add_argument("--delimiter", "-d", help="split stdin prompts on this line (else one per line)")
-    p.add_argument("--jobs", "-j", type=int, default=4, help="parallel workers (default 4)")
+    p.add_argument("--jobs", "-j", type=int, default=8,
+                   help="parallel workers (default 8 — gemini tolerates wide fan-out)")
     p.add_argument("--model", "-m", help="explicit model for all calls")
     p.add_argument("--flash", action="store_true", help="use the fast/cheap model for all")
     p.add_argument("--pro", action="store_true", help="use the most capable model for all")

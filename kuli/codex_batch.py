@@ -24,7 +24,8 @@ def parse_args():
     p = argparse.ArgumentParser(prog=PROG, description="Fan out read-only codex questions.")
     p.add_argument("--cd", "-C", help="shared working root for all calls")
     p.add_argument("--delimiter", "-d", help="split prompts on this line (else one per line)")
-    p.add_argument("--jobs", "-j", type=int, default=4, help="parallel workers (default 4)")
+    p.add_argument("--jobs", "-j", type=int, default=2,
+                   help="parallel workers (default 2 — codex rate-limits easily)")
     p.add_argument("--model", "-m", help="explicit model for all")
     p.add_argument("--timeout", type=int, help="per-call timeout seconds (env CODEX_TIMEOUT)")
     p.add_argument("--json", action="store_true", help="emit JSON array of results")

@@ -9,6 +9,8 @@ import json
 import urllib.error
 import urllib.request
 
+from . import health
+
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
@@ -35,7 +37,13 @@ def build_payload(model, messages, temperature, max_tokens, json_mode=False, rea
     return payload
 
 
-def call_api(payload, key, timeout, die, title="kuli"):
+def call_api(payload, key, timeout, die, title="kuli", intern=None):
+    """POST to OpenRouter. On failure, record intern health (if given) then die."""
+    def fail(msg):
+        if intern:
+            health.record_failure(intern, msg, 2)
+        die(msg, 2)
+
     req = urllib.request.Request(
         API_URL,
         data=json.dumps(payload).encode("utf-8"),
@@ -51,11 +59,11 @@ def call_api(payload, key, timeout, die, title="kuli"):
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        die(f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')}", 2)
+        fail(f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')}")
     except TimeoutError:
-        die(f"timed out after {timeout}s — raise --timeout or lower --reasoning effort", 2)
+        fail(f"timed out after {timeout}s — raise --timeout or lower --reasoning effort")
     except urllib.error.URLError as e:
-        die(f"network error: {e.reason}", 2)
+        fail(f"network error: {e.reason}")
 
 
 def extract(data, die):

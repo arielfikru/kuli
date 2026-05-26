@@ -19,9 +19,10 @@ import subprocess
 import sys
 import tempfile
 
-from . import core
+from . import core, health
 
 PROG = "ask-codex"
+INTERN = "codex"
 DEFAULT_TIMEOUT = int(os.environ.get("CODEX_TIMEOUT", "600"))
 
 die = core.make_die(PROG)
@@ -102,9 +103,12 @@ def run_codex(args, prompt):
         except FileNotFoundError:
             die("codex CLI not found on PATH", 2)
         except subprocess.TimeoutExpired:
+            health.record_failure(INTERN, "timed out", 2)
             die(f"codex timed out after {args.timeout}s — raise --timeout", 2)
         if proc.returncode != 0:
-            die(f"codex exited {proc.returncode}: {(proc.stderr or proc.stdout)[:500]}", 2)
+            msg = (proc.stderr or proc.stdout)[:500]
+            health.record_failure(INTERN, msg, 2)
+            die(f"codex exited {proc.returncode}: {msg}", 2)
         if args.json:
             return proc.stdout
         with open(last_file, encoding="utf-8") as fh:
@@ -128,6 +132,7 @@ def main():
         text, votes, _ = core.run_consistency(lambda: (run_codex(args, prompt), None), n)
     else:
         text, votes = run_codex(args, prompt), None
+    health.record_success(INTERN)
     print(text)
     if args.apply and not args.quiet:
         print(f"{PROG}: ⚠ codex ran in WRITE mode — review the diff before keeping changes",

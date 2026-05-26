@@ -9,13 +9,13 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BIN="$CLAUDE_DIR/bin"
 
 echo "==> Installing KULI into $CLAUDE_DIR"
-mkdir -p "$BIN" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/mcp"
+mkdir -p "$BIN" "$CLAUDE_DIR/lib" "$CLAUDE_DIR/skills" "$CLAUDE_DIR/mcp"
 
-# Shared package: launchers do `sys.path.insert(0, <their dir>)` then import
-# `kuli`, so the package lives right next to them in ~/.claude/bin.
-rm -rf "$BIN/kuli"
-cp -r "$SRC/kuli" "$BIN/kuli"
-find "$BIN/kuli" -name '__pycache__' -type d -prune -exec rm -rf {} +
+# Shared package lives in ~/.claude/lib (not bin) so it never collides with the
+# `kuli` admin launcher. Launchers add ../lib to sys.path then import `kuli`.
+rm -rf "$CLAUDE_DIR/lib/kuli"
+cp -r "$SRC/kuli" "$CLAUDE_DIR/lib/kuli"
+find "$CLAUDE_DIR/lib/kuli" -name '__pycache__' -type d -prune -exec rm -rf {} +
 
 # Launchers.
 for f in "$SRC"/bin/*; do
@@ -23,7 +23,7 @@ for f in "$SRC"/bin/*; do
 done
 
 # Skills (one per intern).
-for s in deepseek or gemini codex recraft; do
+for s in kuli deepseek or gemini codex recraft; do
   if [ -f "$SRC/skills/$s/SKILL.md" ]; then
     mkdir -p "$CLAUDE_DIR/skills/$s"
     install -m 0644 "$SRC/skills/$s/SKILL.md" "$CLAUDE_DIR/skills/$s/SKILL.md"
@@ -58,6 +58,9 @@ Done. Interns installed:
   ask-codex     (coding)           skill: /codex
   ask-recraft   (SVG vector gen)   skill: /recraft
 plus their -batch variants.
+
+Orchestration: skill /kuli (routing + fallback policy).
+Admin: `kuli health` (benched interns), `kuli health reset <intern>` (after re-login).
 
 AUTH per intern:
   deepseek -> export OPENROUTER_API_KEY="sk-or-..."   (https://openrouter.ai/keys)

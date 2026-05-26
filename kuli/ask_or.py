@@ -12,9 +12,10 @@ Exit codes: 0 ok, 1 usage/input error, 2 API error.
 import argparse
 import os
 
-from . import core, openrouter
+from . import core, health, openrouter
 
 PROG = "ask-or"
+INTERN = "or"
 die = core.make_die(PROG)
 
 
@@ -86,7 +87,7 @@ def main():
 
     def sample():
         final, _thinking, usage = openrouter.extract(
-            openrouter.call_api(payload, key, args.timeout, die, "kuli-ask-or"), die)
+            openrouter.call_api(payload, key, args.timeout, die, "kuli-ask-or", INTERN), die)
         return final, usage
 
     n = args.consistency
@@ -95,10 +96,11 @@ def main():
         usage = openrouter.sum_usage(usages)
     else:
         content, thinking, usage = openrouter.extract(
-            openrouter.call_api(payload, key, args.timeout, die, "kuli-ask-or"), die)
+            openrouter.call_api(payload, key, args.timeout, die, "kuli-ask-or", INTERN), die)
         votes = None
         if args.show_thinking and thinking:
             print(f"<thinking>\n{thinking}\n</thinking>\n")
+    health.record_success(INTERN)
     print(content)
     base = openrouter.format_usage(model, usage) if usage else ""
     core.emit_stats(base, votes, n, args.quiet)
