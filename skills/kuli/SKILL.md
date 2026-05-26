@@ -24,6 +24,11 @@ fallback — there is no auto-router, so you always know who actually ran.
 Routing rules:
 - **New model on an existing backend → just `-m` (use `ask-or`).** New
   capability/backend → a new intern.
+- **Cheap agentic coding (no ChatGPT quota):** the Codex harness can run any
+  OpenRouter model — `ask-deepseek --agentic` / `ask-or -m <slug> --agentic` /
+  `ask-codex --or-model <slug>`. Use when codex (GPT-5.5) is rate-limited/logged
+  out but you still need repo read/edit. Token-heavy; pick a capable slug for
+  `--apply`.
 - **Cost ladder:** prefer the cheapest worker that clears the bar. deepseek/or
   cheap; gemini/codex mid; recraft ~$0.08/image. Don't send trivial inline-able
   work to an intern — the brief+review overhead can cost more than doing it

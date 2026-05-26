@@ -39,6 +39,10 @@ def parse_args():
                         "Default is read-only. Run in a throwaway worktree + review the diff.")
     p.add_argument("--cd", "-C", help="working root for codex (default: cwd)")
     p.add_argument("--model", "-m", help="explicit codex model")
+    p.add_argument("--or-model", dest="or_model", metavar="SLUG",
+                   help="run codex's agentic harness on an OpenRouter model instead of "
+                        "native Codex (e.g. deepseek/deepseek-v4-pro). Needs OPENROUTER_API_KEY; "
+                        "no ChatGPT login required. (env OPENROUTER_MODEL is NOT used here.)")
     p.add_argument("--consistency", "-c", type=int, metavar="N",
                    help="read-only only: sample N, majority-vote the answer")
     p.add_argument("--timeout", type=int, default=DEFAULT_TIMEOUT,
@@ -68,6 +72,18 @@ def build_prompt(args):
     return text
 
 
+def openrouter_overrides(slug):
+    """`-c` config flags pointing codex at an OpenRouter model (Responses API)."""
+    return [
+        "-c", "model_provider=openrouter",
+        "-c", 'model_providers.openrouter.name="OpenRouter"',
+        "-c", 'model_providers.openrouter.base_url="https://openrouter.ai/api/v1"',
+        "-c", 'model_providers.openrouter.env_key="OPENROUTER_API_KEY"',
+        "-c", 'model_providers.openrouter.wire_api="responses"',
+        "-m", slug,
+    ]
+
+
 def build_cmd(args, prompt, last_msg_file):
     sandbox = "workspace-write" if args.apply else "read-only"
     cmd = ["codex", "exec", "--sandbox", sandbox, "--color", "never"]
@@ -76,9 +92,12 @@ def build_cmd(args, prompt, last_msg_file):
         cmd += ["--ephemeral", "--skip-git-repo-check"]
     if args.cd:
         cmd += ["--cd", args.cd]
-    model = args.model or os.environ.get("CODEX_MODEL")
-    if model:
-        cmd += ["-m", model]
+    if args.or_model:
+        cmd += openrouter_overrides(args.or_model)
+    else:
+        model = args.model or os.environ.get("CODEX_MODEL")
+        if model:
+            cmd += ["-m", model]
     for img in args.image:
         cmd += ["-i", img]
     if args.json:

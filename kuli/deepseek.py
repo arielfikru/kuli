@@ -7,11 +7,13 @@ Exit codes: 0 ok, 1 usage/input error, 2 API error.
 """
 import argparse
 import os
+import sys
 
-from . import core, health, openrouter
+from . import agentic, core, health, openrouter
 
 PROG = "ask-deepseek"
 INTERN = "deepseek"
+AGENTIC_MODEL = "deepseek/deepseek-v4-pro"  # pro: better tool-use for the codex harness
 MODEL_PRO = "deepseek/deepseek-v4-pro"
 MODEL_FLASH = "deepseek/deepseek-v4-flash"
 
@@ -42,6 +44,11 @@ def parse_args():
                    default=int(os.environ.get("DEEPSEEK_TIMEOUT", "600")),
                    help="HTTP timeout seconds (env DEEPSEEK_TIMEOUT)")
     p.add_argument("--quiet", "-q", action="store_true", help="suppress usage stats on stderr")
+    p.add_argument("--agentic", action="store_true",
+                   help="agentic coding mode: drive DeepSeek through the Codex harness "
+                        "(reads/edits a repo). Pairs with --apply / --cd.")
+    p.add_argument("--apply", action="store_true", help="(agentic) allow file edits")
+    p.add_argument("--cd", "-C", help="(agentic) working root")
     return p.parse_args()
 
 
@@ -89,6 +96,8 @@ def main():
     if not key:
         die("OPENROUTER_API_KEY not set", 1)
     user = build_prompt(args)
+    if args.agentic:
+        sys.exit(agentic.run(AGENTIC_MODEL, user, args.apply, args.cd, args.timeout, PROG))
     model = resolve_model(args, user)
     if args.temperature is None:
         args.temperature = 0.8 if args.consistency else 0.7

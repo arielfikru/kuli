@@ -135,6 +135,23 @@ Batch flags: `-s SYSTEM`, `-c CONTEXT_FILE`, `-d DELIM`, `-j N` (workers, def 4)
 `--flash`, `--auto`, `-m`, `-t`, `--max-tokens`, `--json`. Use it for fan-out over
 a big document — keep `-s`/`-c` identical so the shared prefix is cached.
 
+## Agentic coding mode (`--agentic`)
+
+Plain `ask-deepseek` is text-only (no repo access). `--agentic` drives DeepSeek
+through the **Codex harness** so it can read a repo, call tools, and edit files —
+cheap agentic coding on OpenRouter $, no ChatGPT login. (Internally shells
+`ask-codex --or-model deepseek/deepseek-v4-pro`.)
+
+```bash
+ask-deepseek --agentic "explain how the parser works here"        # read-only
+ask-deepseek --agentic --apply -C ../wt "add tests for parser"    # edits files
+```
+
+`--apply` = edit mode (use a throwaway worktree, review the diff). `--cd DIR` =
+working root. Note: agentic runs are token-heavy (codex system prompt + tools);
+DeepSeek keeps that cheap, but it's not free. For a stronger agent use `ask-codex`
+(native GPT-5.5) or `ask-or -m <slug> --agentic` for another model.
+
 ## When to delegate (offload to DeepSeek)
 
 - Research / explanation that doesn't need codebase context

@@ -54,6 +54,21 @@ Flags: `-m SLUG` (or env `OPENROUTER_MODEL`; required), `-s SYSTEM`, `-f FILE`,
 `--show-thinking`, `--timeout SEC` (env `OPENROUTER_TIMEOUT`), `-q`.
 `ask-or-batch` adds `-d DELIM`, `-j N`; keep `-s`/`-c` identical for cache hits.
 
+## Agentic coding mode (`--agentic`)
+
+`--agentic` drives your chosen model through the **Codex harness** (reads/edits a
+repo) — agentic coding on ANY OpenRouter model, no ChatGPT login. Internally
+shells `ask-codex --or-model <your -m slug>`.
+
+```bash
+ask-or -m anthropic/claude-opus-4 --agentic --apply -C ../wt "refactor X"
+ask-or -m qwen/qwen3-max --agentic "review this repo's error handling"  # read-only
+```
+
+`--apply` edits files (use a throwaway worktree + review the diff); `--cd DIR` =
+root. Token-heavy (codex harness overhead). Tool-use reliability varies by model —
+stronger models drive the agent better.
+
 ## The intern protocol (same as the others)
 
 1. **Brief** — the intern has no repo memory; bundle context with `-f`. For "is

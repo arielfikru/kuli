@@ -12,7 +12,9 @@ Exit codes: 0 ok, 1 usage/input error, 2 API error.
 import argparse
 import os
 
-from . import core, health, openrouter
+import sys
+
+from . import agentic, core, health, openrouter
 
 PROG = "ask-or"
 INTERN = "or"
@@ -41,6 +43,11 @@ def parse_args():
                    default=int(os.environ.get("OPENROUTER_TIMEOUT", "600")),
                    help="HTTP timeout seconds (env OPENROUTER_TIMEOUT)")
     p.add_argument("--quiet", "-q", action="store_true", help="suppress usage stats on stderr")
+    p.add_argument("--agentic", action="store_true",
+                   help="agentic coding mode: drive this model through the Codex harness "
+                        "(reads/edits a repo). Pairs with --apply / --cd.")
+    p.add_argument("--apply", action="store_true", help="(agentic) allow file edits")
+    p.add_argument("--cd", "-C", help="(agentic) working root")
     return p.parse_args()
 
 
@@ -79,6 +86,8 @@ def main():
         die("OPENROUTER_API_KEY not set", 1)
     model = resolve_model(args)
     user = build_prompt(args)
+    if args.agentic:
+        sys.exit(agentic.run(model, user, args.apply, args.cd, args.timeout, PROG))
     if args.temperature is None:
         args.temperature = 0.8 if args.consistency else 0.7
     messages = openrouter.build_messages(args.system, user)

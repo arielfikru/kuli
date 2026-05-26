@@ -74,6 +74,22 @@ env `CODEX_TIMEOUT`; raise for big agentic runs), `--json` (raw codex JSONL),
 `-q` (no stats). Read-only mode runs `--ephemeral --skip-git-repo-check` so it
 works anywhere without littering sessions.
 
+### Run the harness on a non-OpenAI model (`--or-model`)
+
+Codex's agentic harness can drive **any OpenRouter model** instead of native
+GPT-5.5 — so you get codex's tool-use/sandbox/worktree machinery on a cheap model,
+with **no ChatGPT login** (uses `OPENROUTER_API_KEY`, Responses API).
+
+```bash
+ask-codex --or-model deepseek/deepseek-v4-pro --apply -C ../wt "implement X"
+ask-codex --or-model anthropic/claude-opus-4 "review this repo"   # read-only
+```
+
+This is the engine behind `ask-deepseek --agentic` and `ask-or --agentic`. Use it
+when ChatGPT quota is out or you want a specific/cheaper brain in the harness.
+Caveats: token-heavy (codex system prompt + tool schema); tool-use reliability
+varies by model (use a `-pro`/frontier slug for `--apply`, not a tiny one).
+
 ### Batch fan-out (read-only only)
 
 `ask-codex-batch` fans out many **read-only** questions in parallel (no
