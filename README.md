@@ -138,6 +138,26 @@ Samples N times and majority-votes the answer, printing `agreement V/N` (with
 value and being wrong is costly. Skip for prose/code (every sample differs) or
 when you can verify it yourself. It is N× the tokens — never the default.
 
+## Health & fallback
+
+Each `ask-*` records the outcome of its call to a health file. Claude (the
+orchestrator) consults it before delegating and drives the fallback — there is
+no silent auto-router, so you always know which intern ran.
+
+```bash
+kuli health                 # show benched interns (rate-limited / auth-failed) + minutes left
+kuli health reset gemini    # after `gemini login`, before a natural success heals it
+kuli health reset           # clear all
+```
+
+- **rate-limited** → benched until the reset window passes, then self-heals.
+- **auth-failed** → benched until a later success or `kuli health reset`.
+- **generic errors** → only bench after repeated consecutive failures.
+
+The `/kuli` skill holds the routing policy: which intern for which task, the
+fallback ladder (cheaper model → other intern → Claude as last resort), and the
+heavy-task → ask / light-task → do-it rule when everything is exhausted.
+
 ## MCP (optional)
 
 A single MCP server exposes all interns as typed tools:

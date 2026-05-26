@@ -14,9 +14,10 @@ import shutil
 import subprocess
 import tempfile
 
-from . import core
+from . import core, health
 
 PROG = "ask-gemini"
+INTERN = "gemini"
 DEFAULT_TIMEOUT = int(os.environ.get("GEMINI_TIMEOUT", "300"))
 MODEL_PRO = "gemini-3.1-pro-preview"
 MODEL_FLASH = "gemini-3-flash-preview"
@@ -102,9 +103,12 @@ def run_gemini(args, prompt, files, timeout):
         except FileNotFoundError:
             die("gemini CLI not found on PATH", 2)
         except subprocess.TimeoutExpired:
+            health.record_failure(INTERN, "timed out", 2)
             die(f"gemini timed out after {timeout}s", 2)
     if proc.returncode != 0:
-        die(f"gemini exited {proc.returncode}: {(proc.stderr or proc.stdout)[:500]}", 2)
+        msg = (proc.stderr or proc.stdout)[:500]
+        health.record_failure(INTERN, msg, 2)
+        die(f"gemini exited {proc.returncode}: {msg}", 2)
     return proc.stdout
 
 
@@ -140,6 +144,7 @@ def main():
     else:
         response, data = analyze_once(args, prompt, files, args.timeout)
         votes = None
+    health.record_success(INTERN)
     if args.raw:
         print(json.dumps(data, indent=2))
     else:

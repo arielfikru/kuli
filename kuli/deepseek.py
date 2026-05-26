@@ -8,9 +8,10 @@ Exit codes: 0 ok, 1 usage/input error, 2 API error.
 import argparse
 import os
 
-from . import core, openrouter
+from . import core, health, openrouter
 
 PROG = "ask-deepseek"
+INTERN = "deepseek"
 MODEL_PRO = "deepseek/deepseek-v4-pro"
 MODEL_FLASH = "deepseek/deepseek-v4-flash"
 
@@ -97,7 +98,7 @@ def main():
 
     def sample():
         final, _thinking, usage = openrouter.extract(
-            openrouter.call_api(payload, key, args.timeout, die, "kuli-ask-deepseek"), die)
+            openrouter.call_api(payload, key, args.timeout, die, "kuli-ask-deepseek", INTERN), die)
         return final, usage
 
     n = args.consistency
@@ -106,10 +107,11 @@ def main():
         usage = openrouter.sum_usage(usages)
     else:
         content, thinking, usage = openrouter.extract(
-            openrouter.call_api(payload, key, args.timeout, die, "kuli-ask-deepseek"), die)
+            openrouter.call_api(payload, key, args.timeout, die, "kuli-ask-deepseek", INTERN), die)
         votes = None
         if args.show_thinking and thinking:
             print(f"<thinking>\n{thinking}\n</thinking>\n")
+    health.record_success(INTERN)
     print(content)
     base = openrouter.format_usage(model, usage) if usage else ""
     core.emit_stats(base, votes, n, args.quiet)

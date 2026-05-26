@@ -395,7 +395,8 @@ LAUNCHER = '''#!/usr/bin/env python3
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+_bin = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(_bin, "..", "lib"))
 from kuli.__MOD__ import main
 
 main()

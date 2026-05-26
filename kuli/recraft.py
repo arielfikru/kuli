@@ -11,9 +11,10 @@ import mimetypes
 import os
 import time
 
-from . import core, openrouter
+from . import core, health, openrouter
 
 PROG = "ask-recraft"
+INTERN = "recraft"
 MODEL = "recraft/recraft-v4.1-vector"
 STYLE = ""  # optional style preamble prepended to every prompt
 die = core.make_die(PROG)
@@ -22,7 +23,7 @@ EXT = {"image/svg+xml": "svg", "image/png": "png", "image/jpeg": "jpg", "image/w
 
 
 def parse_args():
-    p = argparse.ArgumentParser(prog=PROG, description="SVG vector image generator (Recraft V4.1 Vector) — icons, logos, illustrations.")
+    p = argparse.ArgumentParser(prog=PROG, description="Generate SVG vector graphics (Recraft V4.1).")
     p.add_argument("prompt", nargs="*", help="text prompt (else read stdin)")
     p.add_argument("--image", "-i", help="optional single input image to guide output")
     p.add_argument("--out", "-o", help="output file path (default: auto-named in cwd)")
@@ -81,11 +82,12 @@ def main():
     text = build_text(args)
     payload = {"model": MODEL, "modalities": ["image"],
                "messages": [{"role": "user", "content": build_content(text, args.image)}]}
-    data = openrouter.call_api(payload, key, args.timeout, die, PROG)
+    data = openrouter.call_api(payload, key, args.timeout, die, PROG, INTERN)
     mime, blob = extract_image(data)
     out = args.out or f"{PROG}-{int(time.time() * 1000)}-{os.getpid()}.{EXT.get(mime, 'bin')}"
     with open(out, "wb") as fh:
         fh.write(blob)
+    health.record_success(INTERN)
     print(os.path.abspath(out))
     usage = data.get("usage", {})
     core.emit_stats(openrouter.format_usage(MODEL, usage) if usage else "", None, None, args.quiet)
