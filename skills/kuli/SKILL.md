@@ -56,6 +56,23 @@ non-repo text: explain/summarize pasted code, draft boilerplate or tests from a
 `-f` file, bulk text transforms. Trivial inline edits: just do them yourself —
 the brief+review overhead outweighs them.
 
+### When YOU (Claude) code, not an intern
+
+Delegation is for **bounded, well-specified** work. Keep these on yourself — you
+are the senior, not a last resort:
+
+- **New feature / new concept** — net-new design where the shape is not yet
+  settled.
+- **Super-heavy or architectural** — decisions that ripple across the codebase,
+  or judgment calls an intern would guess at.
+- **Underspecified** — if you cannot write a tight brief, you cannot delegate it;
+  do it yourself (or split off the bounded sub-parts to interns).
+
+Rule of thumb: can you hand it off as a crisp, self-contained task? → intern.
+Does it need design judgment, novel structure, or whole-system context? → you.
+You may still use an intern for a *bounded slice* (scaffold, tests, a mechanical
+refactor) while you own the design.
+
 ## Health check before delegating
 
 Each `ask-*` records its outcome to a health file. Before a non-trivial
