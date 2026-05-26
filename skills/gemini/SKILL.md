@@ -135,7 +135,11 @@ staging, voting all live there); the MCP server adds nothing but ergonomics.
 ## Notes
 
 - Auth is OAuth-personal (already logged in). If calls 401, re-run `gemini login`.
-- Supported media: common image formats (png/jpg/webp/…) and video (mp4/…). Large
-  videos cost more tokens and time — raise `--timeout`.
+- Supported media: common RASTER image formats (png/jpg/webp/…) and video (mp4/…).
+  Large videos cost more tokens and time — raise `--timeout`.
+- **Do NOT feed SVG (or other vector/XML) to `-f`** — gemini vision is for raster
+  pixels; an SVG makes it stall/time out. To review a generated SVG (e.g. from
+  ask-recraft), rasterize it to PNG first (rsvg-convert/cairosvg/inkscape) and
+  pass the PNG.
 - Related: [[reference-deepseek-delegation]] (text intern), same senior/intern
   review discipline applies here.

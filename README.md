@@ -33,9 +33,12 @@ a shared core, rather than one confused mega-binary.
 ## Install
 
 ```bash
-git clone <repo-url> kuli && cd kuli
+git clone https://github.com/arielfikru/kuli.git && cd kuli
 bash install.sh
 ```
+
+Or point your AI agent at it: "Install ini https://github.com/arielfikru/kuli"
+(the agent reads `INSTALL.md` and runs `install.sh`).
 
 This copies the `kuli` package + thin launchers into `~/.claude/bin`, installs
 the three skills into `~/.claude/skills/`, and wires `~/.claude/bin` onto PATH.
