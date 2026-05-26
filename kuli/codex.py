@@ -94,23 +94,27 @@ def run_codex(args, prompt):
     if not args.json:
         fd, last_file = tempfile.mkstemp(prefix="ask-codex-", suffix=".txt")
         os.close(fd)
-    cmd = build_cmd(args, prompt, last_file)
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True,
-                              stdin=subprocess.DEVNULL, timeout=args.timeout)
-    except FileNotFoundError:
-        die("codex CLI not found on PATH", 2)
-    except subprocess.TimeoutExpired:
-        die(f"codex timed out after {args.timeout}s — raise --timeout", 2)
-    if proc.returncode != 0:
-        die(f"codex exited {proc.returncode}: {(proc.stderr or proc.stdout)[:500]}", 2)
-    if args.json:
-        return proc.stdout
-    try:
+        cmd = build_cmd(args, prompt, last_file)
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True,
+                                  stdin=subprocess.DEVNULL, timeout=args.timeout)
+        except FileNotFoundError:
+            die("codex CLI not found on PATH", 2)
+        except subprocess.TimeoutExpired:
+            die(f"codex timed out after {args.timeout}s — raise --timeout", 2)
+        if proc.returncode != 0:
+            die(f"codex exited {proc.returncode}: {(proc.stderr or proc.stdout)[:500]}", 2)
+        if args.json:
+            return proc.stdout
         with open(last_file, encoding="utf-8") as fh:
             return fh.read().strip() or proc.stdout.strip()
     finally:
-        os.unlink(last_file)
+        if last_file:
+            try:
+                os.unlink(last_file)
+            except OSError:
+                pass
 
 
 def main():

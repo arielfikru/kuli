@@ -7,6 +7,7 @@ Exit codes: 0 ok, 1 usage/input error, 2 API error.
 """
 import argparse
 import base64
+import mimetypes
 import os
 import time
 
@@ -50,10 +51,11 @@ def build_content(text, image):
     ap = os.path.abspath(image)
     if not os.path.exists(ap):
         die(f"input image not found: {image}", 1)
+    mime = mimetypes.guess_type(ap)[0] or "image/png"
     with open(ap, "rb") as fh:
         b64 = base64.b64encode(fh.read()).decode()
     return [{"type": "text", "text": text},
-            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}}]
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}]
 
 
 def extract_image(data):
