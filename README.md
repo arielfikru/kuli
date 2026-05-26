@@ -59,6 +59,13 @@ This copies the `kuli` package into `~/.claude/lib`, the launchers + `kuli` admi
 command into `~/.claude/bin`, the skills into `~/.claude/skills/`, and wires
 `~/.claude/bin` onto PATH.
 
+Uninstall reverses all of it:
+
+```bash
+bash uninstall.sh           # remove code + config (keeps health data)
+bash uninstall.sh --purge   # also delete runtime data (~/.claude/kuli)
+```
+
 ### Auth (per intern)
 
 ```bash
